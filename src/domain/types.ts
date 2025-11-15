@@ -53,7 +53,8 @@ export interface MessageEnvelope<TType extends string, TPayload = Record<string,
 }
 
 export type InboundMessage =
-    | MessageEnvelope<'createGame', { nickname?: string }>
+    | MessageEnvelope<'createGame', { name?: string; nickname?: string }>
+    | MessageEnvelope<'listGames', Record<string, never>>
     | MessageEnvelope<'joinGame', { gameId: string; nickname?: string }>
     | MessageEnvelope<'leaveGame', { gameId: string }>
     | MessageEnvelope<'submitBoard', { gameId: string; cells: CoordinateLabel[] }>
@@ -64,6 +65,7 @@ export type OutboundMessage =
     | MessageEnvelope<'error', { code: string; reason: string }>
     | MessageEnvelope<'gameCreated', { gameId: string }>
     | MessageEnvelope<'gameJoined', { gameId: string; playerId: string }>
+    | MessageEnvelope<'gameList', { games: Array<{ id: string; phase: GamePhase; players: number }> }>
     | MessageEnvelope<'boardAccepted', { gameId: string }>
     | MessageEnvelope<'shotResult', ShotResultPayload>
     | MessageEnvelope<'turnChanged', { gameId: string; activePlayerId: string }>
