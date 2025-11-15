@@ -1,7 +1,7 @@
 import 'dotenv/config';
 
 const DEFAULT_HTTP_PORT = 8181;
-const DEFAULT_WS_PORT = 3333;
+const DEFAULT_WS_PORT = 3000;
 
 const normalizePort = (value: string | undefined, fallback: number): number => {
     const parsed = Number(value);
