@@ -1,31 +1,321 @@
-# RSSchool NodeJS websocket task template
-> Static http server and base task packages. 
-> By default WebSocket client tries to connect to the 3000 port.
+# WebSocket Battleship Server
 
-## Installation
-1. Clone/download repo
-2. `npm install`
+Серверная реализация игры "Морской бой" с использованием WebSocket для real-time мультиплеерного взаимодействия.
 
-## Usage
-**Development**
+## Описание
 
-`npm run start:dev`
+Полнофункциональный backend для игры в морской бой между двумя игроками. Сервер управляет игровой логикой, комнатами, расстановкой кораблей, боевой системой и определением победителя.
 
-* App served @ `http://localhost:8181` with nodemon
+## Технологии
 
-**Production**
+- **Node.js** v24.x.x
+- **TypeScript** 5.x
+- **ws** - WebSocket библиотека
+- **tsx** - TypeScript executor
 
-`npm run start`
+## Установка
 
-* App served @ `http://localhost:8181` without nodemon
+```bash
+npm install
+```
 
----
+## Запуск
 
-**All commands**
+```bash
+npm start
+```
 
-Command | Description
---- | ---
-`npm run start:dev` | App served @ `http://localhost:8181` with nodemon
-`npm run start` | App served @ `http://localhost:8181` without nodemon
+Сервер запустится на двух портах:
+- **HTTP сервер**: `http://localhost:8181` - фронтенд интерфейс
+- **WebSocket сервер**: `ws://localhost:3000` - игровой сервер
 
-**Note**: replace `npm` with `yarn` in `package.json` if you use yarn.
+## Разработка
+
+```bash
+npm run start:dev  # Запуск с auto-reload
+```
+
+## Структура проекта
+
+```
+src/
+├── index.ts                    # Точка входа
+├── database.ts                 # In-memory БД игроков
+├── rooms.ts                    # Управление игровыми комнатами
+├── game.ts                     # Игровая логика и механика боя
+├── http_server/
+│   └── index.js               # HTTP сервер для фронтенда
+└── websocket/
+    ├── server.ts              # WebSocket сервер
+    ├── handlers.ts            # Основной роутинг команд
+    ├── handlers-room.ts       # Обработчики комнат
+    ├── handlers-ships.ts      # Обработчики кораблей
+    ├── handlers-game.ts       # Обработчики боевых действий
+    └── types.ts               # TypeScript типы
+
+front/                          # Фронтенд приложение
+```
+
+## WebSocket API
+
+Все сообщения отправляются в формате JSON с полями `type`, `data`, `id`.
+
+### Регистрация и авторизация
+
+#### Регистрация/Логин игрока
+**Запрос:**
+```json
+{
+  "type": "reg",
+  "data": {
+    "name": "string",
+    "password": "string"
+  },
+  "id": 0
+}
+```
+
+**Ответ:**
+```json
+{
+  "type": "reg",
+  "data": {
+    "name": "string",
+    "index": "number",
+    "error": "boolean",
+    "errorText": "string"
+  },
+  "id": 0
+}
+```
+
+#### Таблица победителей
+**Ответ (broadcast):**
+```json
+{
+  "type": "update_winners",
+  "data": [
+    {
+      "name": "string",
+      "wins": "number"
+    }
+  ],
+  "id": 0
+}
+```
+
+### Управление комнатами
+
+#### Создать комнату
+**Запрос:**
+```json
+{
+  "type": "create_room",
+  "data": "",
+  "id": 0
+}
+```
+
+#### Присоединиться к комнате
+**Запрос:**
+```json
+{
+  "type": "add_user_to_room",
+  "data": {
+    "indexRoom": "number|string"
+  },
+  "id": 0
+}
+```
+
+**Ответ (оба игрока):**
+```json
+{
+  "type": "create_game",
+  "data": {
+    "idGame": "number|string",
+    "idPlayer": "number|string"
+  },
+  "id": 0
+}
+```
+
+#### Список доступных комнат
+**Ответ (broadcast):**
+```json
+{
+  "type": "update_room",
+  "data": [
+    {
+      "roomId": "number|string",
+      "roomUsers": [
+        {
+          "name": "string",
+          "index": "number|string"
+        }
+      ]
+    }
+  ],
+  "id": 0
+}
+```
+
+### Расстановка кораблей
+
+#### Добавить корабли
+**Запрос:**
+```json
+{
+  "type": "add_ships",
+  "data": {
+    "gameId": "number|string",
+    "ships": [
+      {
+        "position": { "x": "number", "y": "number" },
+        "direction": "boolean",
+        "length": "number",
+        "type": "small|medium|large|huge"
+      }
+    ],
+    "indexPlayer": "number|string"
+  },
+  "id": 0
+}
+```
+
+**Примечание:** `direction` - `false` = горизонтально, `true` = вертикально
+
+#### Старт игры
+**Ответ (оба игрока после добавления кораблей):**
+```json
+{
+  "type": "start_game",
+  "data": {
+    "ships": [ /* массив своих кораблей */ ],
+    "currentPlayerIndex": "number|string"
+  },
+  "id": 0
+}
+```
+
+### Боевая система
+
+#### Атака
+**Запрос:**
+```json
+{
+  "type": "attack",
+  "data": {
+    "gameId": "number|string",
+    "x": "number",
+    "y": "number",
+    "indexPlayer": "number|string"
+  },
+  "id": 0
+}
+```
+
+#### Случайная атака
+**Запрос:**
+```json
+{
+  "type": "randomAttack",
+  "data": {
+    "gameId": "number|string",
+    "indexPlayer": "number|string"
+  },
+  "id": 0
+}
+```
+
+#### Результат атаки
+**Ответ (оба игрока):**
+```json
+{
+  "type": "attack",
+  "data": {
+    "position": { "x": "number", "y": "number" },
+    "currentPlayer": "number|string",
+    "status": "miss|shot|killed"
+  },
+  "id": 0
+}
+```
+
+**Статусы:**
+- `miss` - промах, ход переходит сопернику
+- `shot` - попадание, игрок стреляет ещё раз
+- `killed` - корабль уничтожен, игрок стреляет ещё раз + помечаются клетки вокруг
+
+#### Информация о ходе
+**Ответ (оба игрока):**
+```json
+{
+  "type": "turn",
+  "data": {
+    "currentPlayer": "number|string"
+  },
+  "id": 0
+}
+```
+
+#### Завершение игры
+**Ответ (оба игрока):**
+```json
+{
+  "type": "finish",
+  "data": {
+    "winPlayer": "number|string"
+  },
+  "id": 0
+}
+```
+
+## Игровая логика
+
+### Правила игры
+
+1. **Регистрация**: Игроки регистрируются с именем и паролем
+2. **Комната**: Один игрок создаёт комнату, второй присоединяется
+3. **Расстановка**: Оба игрока размещают корабли на поле 10x10
+4. **Бой**: Игроки по очереди стреляют по клеткам противника
+5. **Победа**: Побеждает тот, кто первым уничтожит все корабли противника
+
+### Корабли
+
+Стандартный набор из 10 кораблей:
+- 1x huge (4 клетки)
+- 2x large (3 клетки)
+- 3x medium (2 клетки)
+- 4x small (1 клетка)
+
+### Механика боя
+
+- **Промах** → ход переходит сопернику
+- **Попадание** → игрок стреляет ещё раз
+- **Уничтожение корабля** → игрок стреляет ещё раз + автоматически помечаются все клетки вокруг корабля как промахи
+
+## Особенности реализации
+
+- **In-memory база данных** - данные хранятся в памяти сервера
+- **Real-time обновления** - все изменения моментально передаются всем клиентам
+- **Валидация ходов** - проверка очерёдности и правильности действий
+- **Автоматическое определение победителя** - подсчёт уничтоженных кораблей
+- **Статистика побед** - таблица лидеров обновляется после каждой игры
+
+## Логирование
+
+Сервер логирует в консоль:
+- Подключения/отключения клиентов
+- Все входящие команды
+- Все исходящие сообщения
+- Важные игровые события (создание комнат, игр, уничтожение кораблей)
+- Ошибки
+
+## Лицензия
+
+ISC
+
+## Автор
+
+Andrei Auchynnikau
