@@ -1,6 +1,16 @@
 import { WebSocketServer, type WebSocket, type RawData } from 'ws';
 import { type InboundMessage, type OutboundMessage, PlayerRole } from '../domain/index.js';
-import { attachPlayer, createGameRoom, createPlayer, listGames, registerGame } from '../domain/game.js';
+import {
+    attachPlayer,
+    createGameRoom,
+    createPlayer,
+    detachPlayer,
+    gameHasFreeSlot,
+    getGameOrFail,
+    listGames,
+    registerGame,
+    removeGame,
+} from '../domain/game.js';
 
 type AnyMessage = InboundMessage | { type: string; payload?: unknown };
 type MessageOfType<T extends InboundMessage['type']> = Extract<InboundMessage, { type: T }>;
@@ -81,6 +91,67 @@ const handleListGames = (client: ClientContext, _message: MessageOfType<'listGam
     send(client.socket, { type: 'gameList', payload: { games } });
 };
 
+const handleJoinGame = (client: ClientContext, message: MessageOfType<'joinGame'>): void => {
+    if (client.gameId && client.gameId !== message.payload.gameId) {
+        send(client.socket, {
+            type: 'error',
+            payload: { code: 'already-in-game', reason: 'Leave current game first' },
+        });
+        return;
+    }
+
+    const game = getGameOrFail(message.payload.gameId);
+    if (!gameHasFreeSlot(game)) {
+        send(client.socket, {
+            type: 'error',
+            payload: { code: 'lobby-full', reason: 'Game lobby is full' },
+        });
+        return;
+    }
+
+    const player = createPlayer(PlayerRole.Participant, message.payload.nickname);
+    attachPlayer(game, player);
+
+    client.playerId = player.id;
+    client.gameId = game.id;
+
+    send(client.socket, {
+        type: 'gameJoined',
+        payload: { gameId: game.id, playerId: player.id },
+    });
+};
+
+const handleLeaveGame = (
+    client: ClientContext,
+    message: MessageOfType<'leaveGame'>,
+    opts: { silent?: boolean } = {}
+): void => {
+    if (!client.gameId) {
+        if (!opts.silent) {
+            send(client.socket, {
+                type: 'error',
+                payload: { code: 'not-in-game', reason: 'Join a game first' },
+            });
+        }
+        return;
+    }
+
+    const game = getGameOrFail(client.gameId);
+    detachPlayer(game, client.playerId);
+
+    if (game.players.length === 0) {
+        removeGame(game.id);
+    }
+
+    const payload = { gameId: game.id, playerId: client.playerId };
+    if (!opts.silent) {
+        send(client.socket, { type: 'gameLeft', payload });
+    }
+
+    client.gameId = undefined;
+    client.playerId = '';
+};
+
 const handleNotImplemented = (client: ClientContext, type: string): void => {
     send(client.socket, {
         type: 'error',
@@ -97,7 +168,11 @@ const dispatchMessage = (client: ClientContext, message: InboundMessage): void =
             handleListGames(client, message);
             break;
         case 'joinGame':
+            handleJoinGame(client, message);
+            break;
         case 'leaveGame':
+            handleLeaveGame(client, message);
+            break;
         case 'submitBoard':
         case 'randomBoard':
         case 'fire':
@@ -140,6 +215,9 @@ const setupSocket = (socket: WebSocket): ClientContext => {
     socket.on('ping', () => heartbeat(ctx));
     socket.on('pong', () => heartbeat(ctx));
     socket.on('close', () => {
+        if (ctx.gameId) {
+            handleLeaveGame(ctx, { type: 'leaveGame', payload: { gameId: ctx.gameId } }, { silent: true });
+        }
         clients.delete(socket);
         console.log('[ws] client disconnected');
     });

@@ -65,6 +65,7 @@ export type OutboundMessage =
     | MessageEnvelope<'error', { code: string; reason: string }>
     | MessageEnvelope<'gameCreated', { gameId: string }>
     | MessageEnvelope<'gameJoined', { gameId: string; playerId: string }>
+    | MessageEnvelope<'gameLeft', { gameId: string; playerId: string }>
     | MessageEnvelope<'gameList', { games: Array<{ id: string; phase: GamePhase; players: number }> }>
     | MessageEnvelope<'boardAccepted', { gameId: string }>
     | MessageEnvelope<'shotResult', ShotResultPayload>

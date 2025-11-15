@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import { DEFAULT_FLEET_LAYOUT, BOARD_SIZE, ShotOutcome, GamePhase, PlayerRole } from './index.js';
+import { DEFAULT_FLEET_LAYOUT, ShotOutcome, GamePhase, PlayerRole } from './index.js';
 import type { CoordinateLabel, FleetState, ShipPlacement, ShotResultPayload } from './types.js';
 import { generateRandomBoard, validateBoardLayout } from './board.js';
 import { parseCoordinate } from './coordinates.js';
@@ -48,8 +48,15 @@ export const createGameRoom = (name?: string): GameRoom => ({
     phase: GamePhase.Lobby,
 });
 
+export const gameHasFreeSlot = (game: GameRoom): boolean => game.players.length < MAX_PLAYERS;
+
+export const registerPlayerPresence = (player: PlayerSession): void => {
+    player.connected = true;
+    player.lastHeartbeatAt = Date.now();
+};
+
 export const attachPlayer = (game: GameRoom, player: PlayerSession): void => {
-    if (game.players.length >= MAX_PLAYERS) {
+    if (!gameHasFreeSlot(game)) {
         throw new Error('Game lobby is full');
     }
     game.players.push(player);
@@ -59,21 +66,32 @@ export const attachPlayer = (game: GameRoom, player: PlayerSession): void => {
     }
 };
 
+export const findPlayer = (game: GameRoom, playerId: string): PlayerSession | undefined =>
+    game.players.find((p) => p.id === playerId);
+
+export const getPlayerOrFail = (game: GameRoom, playerId: string): PlayerSession => {
+    const player = findPlayer(game, playerId);
+    if (!player) {
+        throw new Error('Player not in this game');
+    }
+    return player;
+};
+
 export const detachPlayer = (game: GameRoom, playerId: string): void => {
     game.players = game.players.filter((p) => p.id !== playerId);
     game.updatedAt = Date.now();
-    if (game.players.length < MAX_PLAYERS) {
+    game.currentTurn = undefined;
+    game.winnerId = undefined;
+
+    if (game.players.length < MAX_PLAYERS && game.phase === GamePhase.Active) {
+        game.phase = GamePhase.Finished;
+    } else if (game.players.length < MAX_PLAYERS) {
         game.phase = GamePhase.Lobby;
-        game.currentTurn = undefined;
-        game.winnerId = undefined;
     }
 };
 
 export const submitBoard = (game: GameRoom, playerId: string, cells: CoordinateLabel[]): FleetState => {
-    const player = game.players.find((p) => p.id === playerId);
-    if (!player) {
-        throw new Error('Player not in this game');
-    }
+    const player = getPlayerOrFail(game, playerId);
 
     const result = validateBoardLayout(cells);
     if (!result.valid || !result.fleet) {
@@ -142,9 +160,9 @@ export const performShot = (
         throw new Error('Not your turn');
     }
 
-    const shooter = game.players.find((p) => p.id === shooterId);
+    const shooter = getPlayerOrFail(game, shooterId);
     const opponent = findOpponent(game, shooterId);
-    if (!shooter || !opponent || !opponent.board) {
+    if (!opponent || !opponent.board) {
         throw new Error('Opponent not ready');
     }
 
@@ -191,5 +209,13 @@ export const removeGame = (gameId: string): void => {
 };
 
 export const findGame = (gameId: string): GameRoom | undefined => activeGames.get(gameId);
+
+export const getGameOrFail = (gameId: string): GameRoom => {
+    const game = findGame(gameId);
+    if (!game) {
+        throw new Error('Game not found');
+    }
+    return game;
+};
 
 export const listGames = (): GameRoom[] => Array.from(activeGames.values());
