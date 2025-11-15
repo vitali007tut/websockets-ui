@@ -3,6 +3,8 @@ import { handleMessage } from './handlers.js';
 
 export const clients = new Set<WebSocket>();
 
+export const wsPlayerMap = new Map<WebSocket, { name: string; index: number }>();
+
 export function createWebSocketServer(port: number) {
   const wss = new WebSocketServer({ port });
 
@@ -27,6 +29,7 @@ export function createWebSocketServer(port: number) {
     ws.on('close', () => {
       console.log('Client disconnected');
       clients.delete(ws);
+      wsPlayerMap.delete(ws);
     });
 
     ws.on('error', (error) => {

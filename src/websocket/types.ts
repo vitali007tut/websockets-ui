@@ -21,3 +21,20 @@ export interface WinnerData {
   wins: number;
 }
 
+export interface AddUserToRoomRequest {
+  indexRoom: number | string;
+}
+
+export interface CreateGameResponse {
+  idGame: number | string;
+  idPlayer: number | string;
+}
+
+export interface RoomData {
+  roomId: number | string;
+  roomUsers: Array<{
+    name: string;
+    index: number | string;
+  }>;
+}
+
