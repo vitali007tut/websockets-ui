@@ -9,9 +9,6 @@ export function handleAttack(ws: WebSocket, data: string | object) {
     const requestData: AttackRequest = typeof data === 'string' ? JSON.parse(data) : data;
     const { gameId, x, y, indexPlayer } = requestData;
 
-    console.log(`\n>>> ATTACK CLICK: x=${x}, y=${y}, indexPlayer=${indexPlayer}`);
-    console.log(`    Will check board[${y}][${x}]`);
-
     const gameIdNum = typeof gameId === 'string' ? parseInt(gameId, 10) : gameId;
     const playerIdNum = typeof indexPlayer === 'string' ? parseInt(indexPlayer, 10) : indexPlayer;
 
@@ -36,7 +33,6 @@ export function handleRandomAttack(ws: WebSocket, data: string | object) {
       return;
     }
 
-    console.log(`Random attack at ${coords.x},${coords.y}`);
     processAttack(gameIdNum, playerIdNum, coords.x, coords.y);
   } catch (error) {
     console.error('Error handling random attack:', error);

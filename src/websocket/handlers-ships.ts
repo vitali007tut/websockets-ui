@@ -8,10 +8,6 @@ export function handleAddShips(ws: WebSocket, data: string | object) {
     const requestData: AddShipsRequest = typeof data === 'string' ? JSON.parse(data) : data;
     const { gameId, ships, indexPlayer } = requestData;
 
-    console.log(`\n=== ADD SHIPS REQUEST ===`);
-    console.log(`GameId: ${gameId}, IndexPlayer: ${indexPlayer}`);
-    console.log(`Ships received:`, JSON.stringify(ships, null, 2));
-
     const gameIdNum = typeof gameId === 'string' ? parseInt(gameId, 10) : gameId;
     const playerIdNum = typeof indexPlayer === 'string' ? parseInt(indexPlayer, 10) : indexPlayer;
 

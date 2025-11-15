@@ -114,40 +114,23 @@ class GameManager {
   }
 
   private placeShipsOnBoard(player: GamePlayer): void {
-    console.log('Placing ships on board:');
     for (const ship of player.ships) {
       const { x, y } = ship.position;
-      const { direction, length, type } = ship;
-
-      console.log(
-        `  Ship ${type} at (${x},${y}), length=${length}, direction=${direction ? 'VERTICAL' : 'HORIZONTAL'}`
-      );
+      const { direction, length } = ship;
 
       for (let i = 0; i < length; i++) {
         if (!direction) {
           // direction=false from frontend means horizontal on server
           if (x + i < 10) {
             player.board[y][x + i] = 'ship';
-            console.log(`    Placed at board[${y}][${x + i}] = (x:${x + i}, y:${y})`);
           }
         } else {
           // direction=true from frontend means vertical on server
           if (y + i < 10) {
             player.board[y + i][x] = 'ship';
-            console.log(`    Placed at board[${y + i}][${x}] = (x:${x}, y:${y + i})`);
           }
         }
       }
-    }
-
-    // Print board state
-    console.log('Board state:');
-    for (let row = 0; row < 10; row++) {
-      let rowStr = `  Row ${row}: `;
-      for (let col = 0; col < 10; col++) {
-        rowStr += player.board[row][col] === 'ship' ? 'X' : '.';
-      }
-      console.log(rowStr);
     }
   }
 
@@ -167,7 +150,6 @@ class GameManager {
     // Check if already hit this cell
     const cellKey = `${x},${y}`;
     if (defendingPlayer.hits.has(cellKey)) {
-      console.log(`Cell ${x},${y} already hit`);
       return { status: 'miss' };
     }
 
@@ -175,17 +157,11 @@ class GameManager {
     defendingPlayer.hits.add(cellKey);
 
     // Check if hit a ship
-    const cellValue = defendingPlayer.board[y] ? defendingPlayer.board[y][x] : undefined;
-    console.log(`Attack at (${x},${y}): board[${y}][${x}] = "${cellValue}"`);
-
     if (defendingPlayer.board[y] && defendingPlayer.board[y][x] === 'ship') {
-      // Hit!
-      console.log(`HIT at (${x},${y})!`);
-
       // Check if ship is killed
       const killedShip = this.findKilledShip(defendingPlayer, x, y);
       if (killedShip) {
-        console.log(`Ship KILLED at (${x},${y})`);
+        console.log(`Ship killed at (${x},${y})`);
         
         // Get cells around killed ship to mark as miss
         const cellsToMark = this.getCellsAroundShip(killedShip);
@@ -202,7 +178,6 @@ class GameManager {
     }
 
     // Miss
-    console.log(`MISS at (${x},${y})`);
     return { status: 'miss' };
   }
 
