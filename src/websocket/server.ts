@@ -11,8 +11,22 @@ import {
     registerGame,
     removeGame,
 } from '../domain/game.js';
+import { registerUser } from '../domain/users.js';
 
-type AnyMessage = InboundMessage | { type: string; payload?: unknown };
+interface RegistrationMessage {
+    type: 'reg';
+    data?: string | { name?: string; password?: string };
+    id?: number | string;
+}
+
+type AnyMessage =
+    | InboundMessage
+    | RegistrationMessage
+    | {
+          type: string;
+          payload?: unknown;
+      };
+
 type MessageOfType<T extends InboundMessage['type']> = Extract<InboundMessage, { type: T }>;
 
 const inboundTypes: InboundMessage['type'][] = [
@@ -27,6 +41,8 @@ const inboundTypes: InboundMessage['type'][] = [
 
 const isInboundMessage = (value: AnyMessage): value is InboundMessage =>
     inboundTypes.includes(value.type as InboundMessage['type']);
+
+const isRegistrationMessage = (value: AnyMessage): value is RegistrationMessage => value.type === 'reg';
 
 const HEARTBEAT_INTERVAL = 15_000;
 const CLIENT_TIMEOUT = 45_000;
@@ -55,6 +71,80 @@ const parseInbound = (data: RawData): AnyMessage | null => {
         console.error('[ws] failed to parse message', error);
         return null;
     }
+};
+
+const normalizeRegistrationData = (
+    raw: RegistrationMessage['data']
+): { expectsString: boolean; name: string; password: string; errorText?: string } => {
+    if (typeof raw === 'string') {
+        try {
+            const decoded = JSON.parse(raw);
+            return {
+                expectsString: true,
+                name: decoded?.name ?? '',
+                password: decoded?.password ?? '',
+            };
+        } catch {
+            return {
+                expectsString: true,
+                name: '',
+                password: '',
+                errorText: 'Malformed registration payload',
+            };
+        }
+    }
+    if (raw && typeof raw === 'object') {
+        return {
+            expectsString: false,
+            name: raw.name ?? '',
+            password: raw.password ?? '',
+        };
+    }
+    return {
+        expectsString: false,
+        name: '',
+        password: '',
+        errorText: 'Registration data missing',
+    };
+};
+
+const sendRegistrationResponse = (
+    socket: WebSocket,
+    id: number | string,
+    expectsString: boolean,
+    result: { name: string; index?: number; error: boolean; errorText: string }
+): void => {
+    const payload = {
+        name: result.name,
+        index: result.index ?? '',
+        error: result.error,
+        errorText: result.errorText,
+    };
+
+    socket.send(
+        JSON.stringify({
+            type: 'reg',
+            data: expectsString ? JSON.stringify(payload) : payload,
+            id,
+        })
+    );
+};
+
+const handleRegistration = (socket: WebSocket, message: RegistrationMessage): void => {
+    const id = message.id ?? 0;
+    const parsed = normalizeRegistrationData(message.data);
+
+    if (parsed.errorText) {
+        sendRegistrationResponse(socket, id, parsed.expectsString, {
+            name: '',
+            error: true,
+            errorText: parsed.errorText,
+        });
+        return;
+    }
+
+    const result = registerUser(parsed.name, parsed.password);
+    sendRegistrationResponse(socket, id, parsed.expectsString, result);
 };
 
 const handleCreateGame = (client: ClientContext, message: MessageOfType<'createGame'>): void => {
@@ -136,16 +226,18 @@ const handleLeaveGame = (
         return;
     }
 
-    const game = getGameOrFail(client.gameId);
+    const game = getGameOrFail(message.payload.gameId);
     detachPlayer(game, client.playerId);
 
     if (game.players.length === 0) {
         removeGame(game.id);
     }
 
-    const payload = { gameId: game.id, playerId: client.playerId };
     if (!opts.silent) {
-        send(client.socket, { type: 'gameLeft', payload });
+        send(client.socket, {
+            type: 'gameLeft',
+            payload: { gameId: game.id, playerId: client.playerId },
+        });
     }
 
     client.gameId = undefined;
@@ -196,12 +288,26 @@ const setupSocket = (socket: WebSocket): ClientContext => {
     socket.on('message', (data) => {
         const message = parseInbound(data);
         if (!message) {
-            send(socket, {
-                type: 'error',
-                payload: { code: 'bad-json', reason: 'Unable to parse message' },
-            });
+            socket.send(
+                JSON.stringify({
+                    type: 'reg',
+                    data: JSON.stringify({
+                        name: '',
+                        index: '',
+                        error: true,
+                        errorText: 'Malformed JSON',
+                    }),
+                    id: 0,
+                })
+            );
             return;
         }
+
+        if (isRegistrationMessage(message)) {
+            handleRegistration(socket, message);
+            return;
+        }
+
         if (!isInboundMessage(message)) {
             send(socket, {
                 type: 'error',
@@ -209,6 +315,7 @@ const setupSocket = (socket: WebSocket): ClientContext => {
             });
             return;
         }
+
         dispatchMessage(ctx, message);
     });
 
