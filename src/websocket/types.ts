@@ -38,3 +38,28 @@ export interface RoomData {
   }>;
 }
 
+export interface ShipData {
+  position: {
+    x: number;
+    y: number;
+  };
+  direction: boolean;
+  length: number;
+  type: 'small' | 'medium' | 'large' | 'huge';
+}
+
+export interface AddShipsRequest {
+  gameId: number | string;
+  ships: ShipData[];
+  indexPlayer: number | string;
+}
+
+export interface StartGameResponse {
+  ships: ShipData[];
+  currentPlayerIndex: number | string;
+}
+
+export interface TurnResponse {
+  currentPlayer: number | string;
+}
+

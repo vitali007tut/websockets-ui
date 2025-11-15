@@ -4,6 +4,7 @@ import { roomManager } from '../rooms.js';
 import { sendToClient, broadcastToAll, wsPlayerMap } from './server.js';
 import { WSMessage, RegRequest, RegResponse } from './types.js';
 import { handleCreateRoom, handleAddUserToRoom } from './handlers-room.js';
+import { handleAddShips } from './handlers-ships.js';
 
 export function handleMessage(ws: WebSocket, message: WSMessage) {
   const { type, data } = message;
@@ -19,6 +20,9 @@ export function handleMessage(ws: WebSocket, message: WSMessage) {
       break;
     case 'add_user_to_room':
       handleAddUserToRoom(ws, data);
+      break;
+    case 'add_ships':
+      handleAddShips(ws, data);
       break;
     default:
       console.log(`Unknown command type: ${type}`);

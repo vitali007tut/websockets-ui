@@ -1,5 +1,6 @@
 import { WebSocket } from 'ws';
 import { roomManager } from '../rooms.js';
+import { gameManager } from '../game.js';
 import { sendToClient, broadcastToAll, wsPlayerMap } from './server.js';
 import { AddUserToRoomRequest, CreateGameResponse } from './types.js';
 
@@ -47,6 +48,9 @@ export function handleAddUserToRoom(ws: WebSocket, data: string | object) {
     if (gameInfo) {
       const room = roomManager.getRoomById(roomId);
       if (room && room.players.length === 2) {
+        // Initialize game
+        gameManager.createGame(gameInfo.gameId);
+
         const response1: CreateGameResponse = {
           idGame: gameInfo.gameId,
           idPlayer: gameInfo.playerIds[0],
