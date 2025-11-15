@@ -63,3 +63,28 @@ export interface TurnResponse {
   currentPlayer: number | string;
 }
 
+export interface AttackRequest {
+  gameId: number | string;
+  x: number;
+  y: number;
+  indexPlayer: number | string;
+}
+
+export interface RandomAttackRequest {
+  gameId: number | string;
+  indexPlayer: number | string;
+}
+
+export interface AttackResponse {
+  position: {
+    x: number;
+    y: number;
+  };
+  currentPlayer: number | string;
+  status: 'miss' | 'killed' | 'shot';
+}
+
+export interface FinishResponse {
+  winPlayer: number | string;
+}
+
